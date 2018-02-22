@@ -1,8 +1,65 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void read_matrix(FILE* input, int word_size, int block_size, int n, unsigned long** M) {
+    char* block_buffer = (char*)malloc(block_size * sizeof(char));
+    char* symbol_buffer = (char*)malloc(2 * sizeof(char));
+    symbol_buffer[1] = '\0';
+
+    int w = 0;
+    int word_cursor = word_size;
+
+    for (int i = 0; i < n; ++i) {
+        M[i][w] = 0;
+
+        fscanf(input, "%s", block_buffer);
+        for (int j = 0; j < block_size; ++j) {
+            symbol_buffer[0] = block_buffer[j];
+
+            M[i][w] <<= 4;
+            M[i][w] += strtol(symbol_buffer, NULL, 16);
+            word_cursor -= 4;
+
+            if (word_cursor == 0) {
+                w++;
+                word_cursor = word_size;
+            }
+        }
+
+        w = 0;
+        word_cursor = word_size;
+    }
+}
+
+void mul_m_v(unsigned long** M, unsigned long* r, int word_cnt, int word_size, int n, unsigned long* Mr) {
+    int w = 0;
+    int word_cursor = word_size;
+    int counter = 0;
+
+    for (int i = 0; i < n; ++i) {
+        Mr[i] = 0;
+        for (int j = 0; j < word_cnt; ++j) {
+            Mr[i] ^= M[i][j] & r[j];
+        }
+        while(Mr[i]) {
+            counter += Mr[i] & 1;
+            Mr[i] >>= 1;
+        }
+        Mr[w] <<= 1;
+        Mr[w] += counter % 2;
+        word_cursor -= 1;
+
+        if (word_cursor == 0) {
+            w++;
+            word_cursor = word_size;
+        }
+
+        counter = 0;
+    }
+}
+
 int main() {
-    FILE* input = fopen("matrix.in", "r");
+    FILE* input = fopen("matrix2.in", "r");
     int n;
 
     fscanf(input, "%d", &n);
@@ -12,39 +69,72 @@ int main() {
         block_size += 1;
     }
 
-    char* block_buffer = (char*)malloc(block_size * sizeof(char));
-    char* symbol_buffer = (char*)malloc(sizeof(char));
-
-    int word_size = sizeof(long) * 8;
+    int word_size = sizeof(unsigned long) * 8;
     int word_cnt = n / word_size;
     if (n % word_size != 0) {
         word_cnt += 1;
     }
+    int cut_tail_size = word_size * word_cnt - n;
 
-    long** words = (long**)malloc(n * sizeof(long*));
-    int w = 0;
-    int word_cursor = word_size;
+    unsigned long* r = (unsigned long*)malloc(word_cnt * sizeof(unsigned long));
+    for (int i = 0; i < word_cnt; ++i) {
+        r[i] = rand();
+        r[i] <<= sizeof(int) * 8;
+        r[i] += rand();
+    }
 
+    unsigned long** A = (unsigned long**)malloc(n * sizeof(unsigned long*));
     for (int i = 0; i < n; ++i) {
-        words[i] = (long*)malloc(word_cnt * sizeof(long));
-        for (int j = 0; j < word_cnt; ++j) {
-            words[i][j] = 0;
-        }
+        A[i] = (unsigned long *) malloc(word_cnt * sizeof(unsigned long));
+    }
 
-        fscanf(input, "%s", block_buffer);
-        for (int j = 0; j < block_size; ++j) {
-            symbol_buffer[0] = block_buffer[j];
+    unsigned long** B = (unsigned long**)malloc(n * sizeof(unsigned long*));
+    for (int i = 0; i < n; ++i) {
+        B[i] = (unsigned long *) malloc(word_cnt * sizeof(unsigned long));
+    }
 
-            words[i][w] <<= 4;
-            words[i][w] += strtol(symbol_buffer, NULL, 16);
-            word_cursor -= 4;
+    unsigned long** C = (unsigned long**)malloc(n * sizeof(unsigned long*));
+    for (int i = 0; i < n; ++i) {
+        C[i] = (unsigned long *) malloc(word_cnt * sizeof(unsigned long));
+    }
 
-            if (word_cursor == 0) {
-                w++;
-                word_cursor = word_size;
-            }
+    read_matrix(input, word_size, block_size, n, A);
+    read_matrix(input, word_size, block_size, n, B);
+    read_matrix(input, word_size, block_size, n, C);
+
+    unsigned long* Br = (unsigned long*)malloc(n * sizeof(unsigned long));
+    unsigned long* ABr = (unsigned long*)malloc(n * sizeof(unsigned long));
+    unsigned long* Cr = (unsigned long*)malloc(n * sizeof(unsigned long));
+
+    mul_m_v(B, r, word_cnt, word_size, n, Br);
+    mul_m_v(A, Br, word_cnt, word_size, n, ABr);
+    mul_m_v(C, r, word_cnt, word_size, n, Cr);
+
+    for (int i = 0; i < word_cnt; ++i) {
+        if (ABr[i] != Cr[i]) {
+            printf("%s", "NO");
+            return 0;
         }
     }
+    printf("%s", "YES");
+
+    free(r);
+    for (int i = 0; i < n; ++i) {
+        free(A[i]);
+    }
+    free(A);
+    for (int i = 0; i < n; ++i) {
+        free(B[i]);
+    }
+    free(B);
+    for (int i = 0; i < n; ++i) {
+        free(C[i]);
+    }
+    free(C);
+
+    free(Br);
+    free(ABr);
+    free(Cr);
 
     fclose(input);
 
