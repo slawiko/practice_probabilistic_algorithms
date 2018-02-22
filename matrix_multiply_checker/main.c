@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
+int iteration_cnt = 50;
 
 void read_matrix(FILE* input, int word_size, int block_size, int n, unsigned long** M) {
-    char* block_buffer = (char*)malloc(block_size * sizeof(char));
+    char* block_buffer = (char*)malloc((block_size + 1) * sizeof(char));
     char* symbol_buffer = (char*)malloc(2 * sizeof(char));
     symbol_buffer[1] = '\0';
 
@@ -29,6 +32,9 @@ void read_matrix(FILE* input, int word_size, int block_size, int n, unsigned lon
         w = 0;
         word_cursor = word_size;
     }
+
+    free(block_buffer);
+    free(symbol_buffer);
 }
 
 void mul_m_v(unsigned long** M, unsigned long* r, int word_cnt, int word_size, int n, unsigned long* Mr) {
@@ -56,10 +62,16 @@ void mul_m_v(unsigned long** M, unsigned long* r, int word_cnt, int word_size, i
 
         counter = 0;
     }
+
+    if (n % 4 != 0) {
+        Mr[w] <<= 4 - (n % 4);
+    }
 }
 
 int main() {
-    FILE* input = fopen("matrix2.in", "r");
+    srand(time(NULL));
+
+    FILE* input = fopen("matrix.in", "r");
     int n;
 
     fscanf(input, "%d", &n);
@@ -74,14 +86,6 @@ int main() {
     if (n % word_size != 0) {
         word_cnt += 1;
     }
-    int cut_tail_size = word_size * word_cnt - n;
-
-    unsigned long* r = (unsigned long*)malloc(word_cnt * sizeof(unsigned long));
-    for (int i = 0; i < word_cnt; ++i) {
-        r[i] = rand();
-        r[i] <<= sizeof(int) * 8;
-        r[i] += rand();
-    }
 
     unsigned long** A = (unsigned long**)malloc(n * sizeof(unsigned long*));
     for (int i = 0; i < n; ++i) {
@@ -90,12 +94,12 @@ int main() {
 
     unsigned long** B = (unsigned long**)malloc(n * sizeof(unsigned long*));
     for (int i = 0; i < n; ++i) {
-        B[i] = (unsigned long *) malloc(word_cnt * sizeof(unsigned long));
+        B[i] = (unsigned long*) malloc(word_cnt * sizeof(unsigned long));
     }
 
     unsigned long** C = (unsigned long**)malloc(n * sizeof(unsigned long*));
     for (int i = 0; i < n; ++i) {
-        C[i] = (unsigned long *) malloc(word_cnt * sizeof(unsigned long));
+        C[i] = (unsigned long*) malloc(word_cnt * sizeof(unsigned long));
     }
 
     read_matrix(input, word_size, block_size, n, A);
@@ -106,29 +110,64 @@ int main() {
     unsigned long* ABr = (unsigned long*)malloc(n * sizeof(unsigned long));
     unsigned long* Cr = (unsigned long*)malloc(n * sizeof(unsigned long));
 
-    mul_m_v(B, r, word_cnt, word_size, n, Br);
-    mul_m_v(A, Br, word_cnt, word_size, n, ABr);
-    mul_m_v(C, r, word_cnt, word_size, n, Cr);
+    FILE* output = fopen("matrix.out", "w");
 
-    for (int i = 0; i < word_cnt; ++i) {
-        if (ABr[i] != Cr[i]) {
-            printf("%s", "NO");
-            return 0;
+    unsigned long* r = (unsigned long*)malloc(word_cnt * sizeof(unsigned long));
+
+    for (int i = 0; i < iteration_cnt; ++i) {
+        for (int j = 0; j < word_cnt; ++j) {
+            r[j] = rand();
+            r[j] <<= sizeof(int) * 8;
+            r[j] += rand();
+        }
+
+        mul_m_v(B, r, word_cnt, word_size, n, Br);
+        mul_m_v(A, Br, word_cnt, word_size, n, ABr);
+        mul_m_v(C, r, word_cnt, word_size, n, Cr);
+
+        for (int j = 0; j < word_cnt; ++j) {
+            if (ABr[j] != Cr[j]) {
+                fprintf(output, "NO");
+
+                free(r);
+                for (int k = 0; k < n; ++k) {
+                    free(A[k]);
+                }
+                free(A);
+                for (int k = 0; k < n; ++k) {
+                    free(B[k]);
+                }
+                free(B);
+                for (int k = 0; k < n; ++k) {
+                    free(C[k]);
+                }
+                free(C);
+
+                free(Br);
+                free(ABr);
+                free(Cr);
+
+                fclose(input);
+                fclose(output);
+
+                return 0;
+            }
         }
     }
-    printf("%s", "YES");
+
+    fprintf(output, "YES");
 
     free(r);
-    for (int i = 0; i < n; ++i) {
-        free(A[i]);
+    for (int k = 0; k < n; ++k) {
+        free(A[k]);
     }
     free(A);
-    for (int i = 0; i < n; ++i) {
-        free(B[i]);
+    for (int k = 0; k < n; ++k) {
+        free(B[k]);
     }
     free(B);
-    for (int i = 0; i < n; ++i) {
-        free(C[i]);
+    for (int k = 0; k < n; ++k) {
+        free(C[k]);
     }
     free(C);
 
@@ -137,6 +176,7 @@ int main() {
     free(Cr);
 
     fclose(input);
+    fclose(output);
 
     return 0;
 }
