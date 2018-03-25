@@ -2,16 +2,19 @@
 #include <stdlib.h>
 #include <time.h>
 
-int iteration_cnt = 50;
-int BIT_IN_BYTE = 8;
+typedef unsigned long word_type;
+const int WORD_SIZE = sizeof(word_type) * 8;
 
-void read_matrix(FILE* input, int word_size, int word_cnt, int block_size, int n, unsigned long** M) {
+int ITERATION_CNT = 50;
+
+void read_matrix(FILE* input, int word_cnt, int block_size, int n, word_type** M) {
     char* block_buffer = (char*) malloc((block_size + 1) * sizeof(char));
     char* symbol_buffer = (char*) malloc(2 * sizeof(char));
     symbol_buffer[1] = '\0';
+    int shift = n % 4 != 0 ? 4 - (n % 4) : 0;
 
     int w = 0;
-    int word_cursor = word_size;
+    int word_cursor = WORD_SIZE;
 
     for (int i = 0; i < n; ++i) {
         M[i][w] = 0;
@@ -27,25 +30,23 @@ void read_matrix(FILE* input, int word_size, int word_cnt, int block_size, int n
             if (word_cursor == 0 && w + 1 < word_cnt) {
                 w++;
                 M[i][w] = 0;
-                word_cursor = word_size;
+                word_cursor = WORD_SIZE;
             }
         }
 
-        if (n % 4 != 0 && word_cursor != 0) {
-            M[i][w] >>= 4 - (n % 4);
-        }
+        M[i][w] >>= shift;
 
         w = 0;
-        word_cursor = word_size;
+        word_cursor = WORD_SIZE;
     }
 
     free(block_buffer);
     free(symbol_buffer);
 }
 
-void mul_m_v(unsigned long** M, unsigned long* r, int word_cnt, int word_size, int n, unsigned long* Mr) {
+void mul_m_v(word_type** M, word_type* r, int word_cnt, int n, word_type* Mr) {
     int w = 0;
-    int word_cursor = word_size;
+    int word_cursor = WORD_SIZE;
     int counter = 0;
 
     for (int i = 0; i < n; ++i) {
@@ -63,7 +64,7 @@ void mul_m_v(unsigned long** M, unsigned long* r, int word_cnt, int word_size, i
 
         if (word_cursor == 0) {
             w++;
-            word_cursor = word_size;
+            word_cursor = WORD_SIZE;
         }
 
         counter = 0;
@@ -83,44 +84,43 @@ int main() {
         block_size += 1;
     }
 
-    int word_size = sizeof(unsigned long) * BIT_IN_BYTE;
-    int word_cnt = n / word_size;
-    if (n % word_size != 0) {
+    int word_cnt = n / WORD_SIZE;
+    if (n % WORD_SIZE != 0) {
         word_cnt += 1;
     }
 
-    unsigned long** A = (unsigned long**) malloc(n * sizeof(unsigned long*));
-    unsigned long** B = (unsigned long**) malloc(n * sizeof(unsigned long*));
-    unsigned long** C = (unsigned long**) malloc(n * sizeof(unsigned long*));
+    word_type** A = (word_type**) malloc(n * sizeof(word_type*));
+    word_type** B = (word_type**) malloc(n * sizeof(word_type*));
+    word_type** C = (word_type**) malloc(n * sizeof(word_type*));
     for (int i = 0; i < n; ++i) {
-        A[i] = (unsigned long*) malloc(word_cnt * sizeof(unsigned long));
-        B[i] = (unsigned long*) malloc(word_cnt * sizeof(unsigned long));
-        C[i] = (unsigned long*) malloc(word_cnt * sizeof(unsigned long));
+        A[i] = (word_type*) malloc(word_cnt * sizeof(word_type));
+        B[i] = (word_type*) malloc(word_cnt * sizeof(word_type));
+        C[i] = (word_type*) malloc(word_cnt * sizeof(word_type));
     }
 
-    read_matrix(input, word_size, word_cnt, block_size, n, A);
-    read_matrix(input, word_size, word_cnt, block_size, n, B);
-    read_matrix(input, word_size, word_cnt, block_size, n, C);
+    read_matrix(input, word_cnt, block_size, n, A);
+    read_matrix(input, word_cnt, block_size, n, B);
+    read_matrix(input, word_cnt, block_size, n, C);
 
-    unsigned long* Br = (unsigned long*) malloc(n * sizeof(unsigned long));
-    unsigned long* ABr = (unsigned long*) malloc(n * sizeof(unsigned long));
-    unsigned long* Cr = (unsigned long*) malloc(n * sizeof(unsigned long));
+    word_type* Br = (word_type*) malloc(n * sizeof(word_type));
+    word_type* ABr = (word_type*) malloc(n * sizeof(word_type));
+    word_type* Cr = (word_type*) malloc(n * sizeof(word_type));
 
     FILE* output = fopen("matrix.out", "w");
 
-    unsigned long* r = (unsigned long*) malloc(word_cnt * sizeof(unsigned long));
+    word_type* r = (word_type*) malloc(word_cnt * sizeof(word_type));
 
-    for (int i = 0; i < iteration_cnt; ++i) {
+    for (int i = 0; i < ITERATION_CNT; ++i) {
         for (int j = 0; j < word_cnt; ++j) {
-            for (int k = 0; k < word_size; ++k) {
+            for (int k = 0; k < WORD_SIZE; ++k) {
                 r[j] <<= 1;
                 r[j] += rand() % 2;
             }
         }
 
-        mul_m_v(B, r, word_cnt, word_size, n, Br);
-        mul_m_v(A, Br, word_cnt, word_size, n, ABr);
-        mul_m_v(C, r, word_cnt, word_size, n, Cr);
+        mul_m_v(B, r, word_cnt, n, Br);
+        mul_m_v(A, Br, word_cnt, n, ABr);
+        mul_m_v(C, r, word_cnt, n, Cr);
 
         for (int j = 0; j < word_cnt; ++j) {
             if (ABr[j] != Cr[j]) {
