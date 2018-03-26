@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-typedef unsigned long word_type;
+typedef unsigned long long word_type;
 const int WORD_SIZE = sizeof(word_type) * 8;
 
 int ITERATION_CNT = 50;
