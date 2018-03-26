@@ -3,7 +3,7 @@
 #include <time.h>
 #include <stdbool.h>
 
-typedef unsigned long word_type;
+typedef unsigned long long word_type;
 const int WORD_SIZE = sizeof(word_type) * 8;
 
 int ITERATION_CNT = 40;
@@ -15,7 +15,7 @@ void write_v(word_type* v, int word_cnt) {
 
     for (int i = 0; i < word_cnt; i++) {
         while(cursor) {
-            printf("%lu ", (v[i] >> (cursor - 1)) & 1);
+            printf("%llu ", (v[i] >> (cursor - 1)) & 1);
             cursor -= 1;
         }
         cursor = WORD_SIZE;
@@ -233,6 +233,10 @@ int main() {
 
                     if (j + 1 == word_cnt) {
                         row -= WORD_SIZE - n % WORD_SIZE;
+                    }
+
+                    if(row == 0) {
+                        return 0;
                     }
 
                     col = seek_col(A[row - 1], B, C[row - 1], word_cnt, n);
