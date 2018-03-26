@@ -3,7 +3,7 @@
 #include <time.h>
 #include <stdbool.h>
 
-typedef unsigned long long word_type;
+typedef unsigned long word_type;
 const int WORD_SIZE = sizeof(word_type) * 8;
 
 int ITERATION_CNT = 40;
@@ -15,10 +15,11 @@ void write_v(word_type* v, int word_cnt) {
 
     for (int i = 0; i < word_cnt; i++) {
         while(cursor) {
-            printf("%llu ", (v[i] >> (cursor - 1)) & 1);
+            printf("%lu ", (v[i] >> (cursor - 1)) & 1);
             cursor -= 1;
         }
         cursor = WORD_SIZE;
+        printf(" ");
     }
     printf("\n");
 }
@@ -118,20 +119,23 @@ int seek_col(word_type* Ai, word_type** B, word_type* Ci, int word_cnt, int n) {
     word_type* Bj = (word_type*) malloc(word_cnt * sizeof(word_type));
     word_type* ABi = (word_type*) malloc(word_cnt * sizeof(word_type));
     int w = 0, result_w = 0;
-    int cursor = 0, result_cursor = 0;
-    ABi[w] = 0;
-    int shift = 0;
+    int cursor = WORD_SIZE, result_cursor = WORD_SIZE;
+    Bj[w] = 0;
+    ABi[result_w] = 0;
+
+    int last_word_shift = 0;
+    int bit_position_shift = 0;
 
     for (int j = 0; j < n; ++j) {
+        bit_position_shift = WORD_SIZE - (j % WORD_SIZE) - 1;
         for (int i = 0; i < n; ++i) {
-            Bj[i] = 0;
             Bj[w] <<= 1;
             if (w + 1 == word_cnt) {
-                shift = WORD_SIZE - n % WORD_SIZE;
+                last_word_shift = WORD_SIZE - n % WORD_SIZE;
             } else {
-                shift = 0;
+                last_word_shift = 0;
             }
-            Bj[w] += ((B[i][w] << shift) >> (WORD_SIZE - (j + 1))) & 1;
+            Bj[w] += ((B[i][j / WORD_SIZE] << last_word_shift) >> bit_position_shift) & 1;
             cursor -= 1;
 
             if (cursor == 0 && w + 1 < word_cnt) {
@@ -174,10 +178,7 @@ int main() {
     srand(time(NULL));
 
     FILE* input = fopen("element.in", "r");
-    int n;
-
     FILE* output = fopen("element.out", "w");
-    fscanf(input, "%d", &n);
 
     word_type** A = (word_type**) malloc(N_MAX * sizeof(word_type*));
     word_type** B = (word_type**) malloc(N_MAX * sizeof(word_type*));
@@ -189,28 +190,27 @@ int main() {
     }
     word_type* r = (word_type*) malloc(WORD_CNT_MAX * sizeof(word_type));
 
+    word_type* Br = (word_type*) malloc(N_MAX * sizeof(word_type));
+    word_type* ABr = (word_type*) malloc(N_MAX * sizeof(word_type));
+    word_type* Cr = (word_type*) malloc(N_MAX * sizeof(word_type));
+
     bool next;
     int word_cnt;
     int block_size;
 
+    int n;
+    fscanf(input, "%d", &n);
+
     while (n) {
         next = false;
         block_size = n / 4;
-        if (n % 4 != 0) {
-            block_size += 1;
-        }
+        block_size += n % 4 != 0 ? 1 : 0;
         word_cnt = n / WORD_SIZE;
-        if (n % WORD_SIZE != 0) {
-            word_cnt += 1;
-        }
+        word_cnt += n % WORD_SIZE != 0 ? 1 : 0;
 
         read_matrix(input, word_cnt, block_size, n, A);
         read_matrix(input, word_cnt, block_size, n, B);
         read_matrix(input, word_cnt, block_size, n, C);
-
-        word_type* Br = (word_type*) malloc(n * sizeof(word_type));
-        word_type* ABr = (word_type*) malloc(n * sizeof(word_type));
-        word_type* Cr = (word_type*) malloc(n * sizeof(word_type));
 
         int col, row;
 
@@ -235,10 +235,6 @@ int main() {
                         row -= WORD_SIZE - n % WORD_SIZE;
                     }
 
-                    if(row == 0) {
-                        return 0;
-                    }
-
                     col = seek_col(A[row - 1], B, C[row - 1], word_cnt, n);
                     fprintf(output, "%d %d\n", row, col);
                     next = true;
@@ -254,10 +250,6 @@ int main() {
             fprintf(output, "No\n");
         }
 
-        free(Br);
-        free(ABr);
-        free(Cr);
-
         fscanf(input, "%d", &n);
     }
 
@@ -270,6 +262,10 @@ int main() {
     free(B);
     free(C);
     free(r);
+
+    free(Br);
+    free(ABr);
+    free(Cr);
 
     fclose(input);
     fclose(output);
