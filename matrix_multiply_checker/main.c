@@ -13,6 +13,23 @@ int bit_count(int v) {
     return (((v + (v >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
 
+void compress(const int* v, word_type* v_compressed, int n) {
+    int w = 0;
+    v_compressed[w] = 0;
+    int word_cursor = WORD_SIZE;
+    for (int i = 0; i < n; ++i) {
+        v_compressed[w] <<= 1;
+        v_compressed[w] += v[i];
+        word_cursor -= 1;
+
+        if (word_cursor == 0) {
+            w++;
+            v_compressed[w] = 0;
+            word_cursor = WORD_SIZE;
+        }
+    }
+}
+
 void read_matrix(FILE* input, int word_cnt, int block_size, int n, word_type** M_compressed) {
     char* block_buffer = (char*) malloc((block_size + 1) * sizeof(char));
     char* symbol_buffer = (char*) malloc(2 * sizeof(char));
@@ -50,10 +67,7 @@ void read_matrix(FILE* input, int word_cnt, int block_size, int n, word_type** M
     free(symbol_buffer);
 }
 
-void mul_m_v(word_type** M_compressed, const word_type* v_compressed, int word_cnt, int n, word_type* Mv_compressed) {
-    int w = 0;
-    Mv_compressed[w] = 0;
-    int word_cursor = WORD_SIZE;
+void mul_m_v(word_type** M_compressed, const word_type* v_compressed, int word_cnt, int n, int* Mv) {
     word_type tmp = 0;
 
     for (int i = 0; i < n; ++i) {
@@ -61,16 +75,7 @@ void mul_m_v(word_type** M_compressed, const word_type* v_compressed, int word_c
             tmp ^= M_compressed[i][j] & v_compressed[j];
         }
 
-        Mv_compressed[w] <<= 1;
-        Mv_compressed[w] += bit_count(tmp) & 1;
-        word_cursor -= 1;
-
-        if (word_cursor == 0) {
-            w++;
-            Mv_compressed[w] = 0;
-            word_cursor = WORD_SIZE;
-        }
-
+        Mv[i] = bit_count(tmp) & 1;
         tmp = 0;
     }
 }
@@ -107,9 +112,12 @@ int main() {
         C_compressed[i] = (word_type*) malloc(word_cnt * sizeof(word_type));
     }
 
-    word_type* Br = (word_type*) malloc(word_cnt * sizeof(word_type));
-    word_type* ABr = (word_type*) malloc(word_cnt * sizeof(word_type));
-    word_type* Cr = (word_type*) malloc(word_cnt * sizeof(word_type));
+    word_type* Br_compressed = (word_type*) malloc(word_cnt * sizeof(word_type));
+    word_type* ABr_compressed = (word_type*) malloc(word_cnt * sizeof(word_type));
+    word_type* Cr_compressed = (word_type*) malloc(word_cnt * sizeof(word_type));
+    int* Br = (int*) malloc(n * sizeof(int));
+    int* ABr = (int*) malloc(n * sizeof(int));
+    int* Cr = (int*) malloc(n * sizeof(int));
 
     word_type* r_compressed = (word_type*) malloc(word_cnt * sizeof(word_type));
 
@@ -121,11 +129,14 @@ int main() {
         generate_r_compressed(r_compressed, word_cnt);
 
         mul_m_v(B_compressed, r_compressed, word_cnt, n, Br);
-        mul_m_v(A_compressed, Br, word_cnt, n, ABr);
+        compress(Br, Br_compressed, n);
+        mul_m_v(A_compressed, Br_compressed, word_cnt, n, ABr);
+        compress(ABr, ABr_compressed, n);
         mul_m_v(C_compressed, r_compressed, word_cnt, n, Cr);
+        compress(Cr, Cr_compressed, n);
 
         for (int j = 0; j < word_cnt; ++j) {
-            if (ABr[j] != Cr[j]) {
+            if (ABr_compressed[j] != Cr_compressed[j]) {
                 fprintf(output, "NO");
 
                 goto exit;
@@ -145,6 +156,9 @@ int main() {
     free(B_compressed);
     free(C_compressed);
 
+    free(Br_compressed);
+    free(ABr_compressed);
+    free(Cr_compressed);
     free(Br);
     free(ABr);
     free(Cr);
