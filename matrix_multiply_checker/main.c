@@ -7,6 +7,12 @@ const int WORD_SIZE = sizeof(word_type) * 8;
 
 int ITERATION_CNT = 50;
 
+int bit_count(int v) {
+    v = v - ((v >> 1) & 0x55555555);
+    v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+    return (((v + (v >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+}
+
 void read_matrix(FILE* input, int word_cnt, int block_size, int n, word_type** M_compressed) {
     char* block_buffer = (char*) malloc((block_size + 1) * sizeof(char));
     char* symbol_buffer = (char*) malloc(2 * sizeof(char));
@@ -48,20 +54,15 @@ void mul_m_v(word_type** M_compressed, const word_type* v_compressed, int word_c
     int w = 0;
     Mv_compressed[w] = 0;
     int word_cursor = WORD_SIZE;
-    int counter = 0;
     word_type tmp = 0;
 
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < word_cnt; ++j) {
             tmp ^= M_compressed[i][j] & v_compressed[j];
         }
-        while (tmp) {
-            counter += tmp & 1;
-            tmp >>= 1;
-        }
 
         Mv_compressed[w] <<= 1;
-        Mv_compressed[w] += counter % 2;
+        Mv_compressed[w] += bit_count(tmp) & 1;
         word_cursor -= 1;
 
         if (word_cursor == 0) {
@@ -70,7 +71,6 @@ void mul_m_v(word_type** M_compressed, const word_type* v_compressed, int word_c
             word_cursor = WORD_SIZE;
         }
 
-        counter = 0;
         tmp = 0;
     }
 }
