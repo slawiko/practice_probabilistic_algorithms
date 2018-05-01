@@ -5,9 +5,10 @@
 
 typedef unsigned int word_type;
 const int WORD_SIZE = sizeof(word_type) * 8;
+const int RAND_SIZE = 16;
 const int N_MAX = 4000;
 const int WORD_CNT_MAX = N_MAX / WORD_SIZE + (N_MAX % WORD_SIZE ? 1 : 0);
-const int ITERATION_CNT = 40;
+const int ITERATION_CNT = 20;
 
 int bit_count(int v) {
     v = v - ((v >> 1) & 0x55555555);
@@ -110,7 +111,7 @@ int seek_col(const int* Ai, int** B, int* Ci, int n) {
     for (int j = 0; j < n; ++j) {
         ABi[j] = 0;
         for (int k = 0; k < n; ++k) {
-            ABi[j] += B[k][j] * Ai[k];
+            ABi[j] ^= B[k][j] & Ai[k];
         }
     }
 
@@ -122,10 +123,9 @@ int seek_col(const int* Ai, int** B, int* Ci, int n) {
 
 void generate_r_compressed(word_type* r_compressed, int word_cnt) {
     for (int j = 0; j < word_cnt; ++j) {
-        for (int k = 0; k < WORD_SIZE; ++k) {
-            r_compressed[j] <<= 1;
-            r_compressed[j] += rand() & 1;
-        }
+        r_compressed[j] = (rand() << RAND_SIZE + 1) |
+                          (rand() << 2) |
+                          (rand() & 3);
     }
 }
 
